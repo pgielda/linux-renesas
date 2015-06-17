@@ -1,0 +1,19 @@
+/dts-v1/;
+
+/ {
+	#address-cells = <0x1>;
+	#size-cells = <0x1>;
+	model = "DIMM-RZA1H";
+	compatible = "renesas,dimmrza1h";
+
+	chosen {
+	};
+
+	aliases {
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x8000000 0x8000000>;
+	};
+};
