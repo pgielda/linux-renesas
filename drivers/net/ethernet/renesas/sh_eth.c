@@ -2,7 +2,7 @@
  *  SuperH Ethernet device driver
  *
  *  Copyright (C) 2006-2012 Nobuhiro Iwamatsu
- *  Copyright (C) 2008-2012 Renesas Solutions Corp.
+ *  Copyright (C) 2008-2013 Renesas Solutions Corp.
  *
  *  This program is free software; you can redistribute it and/or modify it
  *  under the terms and conditions of the GNU General Public License,
@@ -78,8 +78,39 @@ static void sh_eth_select_mii(struct net_device *ndev)
 #endif
 
 /* There is CPU dependent code */
-#if defined(CONFIG_CPU_SUBTYPE_SH7724) || defined(CONFIG_ARCH_R8A7779)
-#define SH_ETH_RESET_DEFAULT	1
+#if defined(CONFIG_CPU_SUBTYPE_SH7724) || defined(CONFIG_ARCH_R8A7779) || \
+	defined(CONFIG_ARCH_RZA1)
+#if !defined(CONFIG_ARCH_RZA1)
+#  define SH_ETH_RESET_DEFAULT	1
+#else
+static int sh_eth_check_reset(struct net_device *ndev);
+
+static int sh_eth_reset(struct net_device *ndev)
+{
+	int ret = 0;
+
+	sh_eth_write(ndev, EDSR_ENALL, EDSR);
+	sh_eth_write(ndev, sh_eth_read(ndev, EDMR) | EDMR_SRST_GETHER, EDMR);
+
+	ret = sh_eth_check_reset(ndev);
+	if (ret)
+		goto out;
+
+	/* Table Init */
+	sh_eth_write(ndev, 0x0, TDLAR);
+	sh_eth_write(ndev, 0x0, TDFAR);
+	sh_eth_write(ndev, 0x0, TDFXR);
+	sh_eth_write(ndev, 0x0, TDFFR);
+	sh_eth_write(ndev, 0x0, RDLAR);
+	sh_eth_write(ndev, 0x0, RDFAR);
+	sh_eth_write(ndev, 0x0, RDFXR);
+	sh_eth_write(ndev, 0x0, RDFFR);
+
+out:
+	return ret;
+}
+
+#endif
 static void sh_eth_set_duplex(struct net_device *ndev)
 {
 	struct sh_eth_private *mdp = netdev_priv(ndev);
@@ -111,6 +142,30 @@ static void sh_eth_set_rate(struct net_device *ndev)
 	}
 }
 
+#if defined(CONFIG_ARCH_RZA1)
+/* RZA1H */
+static struct sh_eth_cpu_data sh_eth_my_cpu_data = {
+	.set_duplex	= sh_eth_set_duplex,
+	.set_rate	= sh_eth_set_rate,
+
+	.ecsr_value	= ECSR_PSRTO | ECSR_ICD,
+	.ecsipr_value	= ECSIPR_PSRTOIP | ECSIPR_ICDIP,
+	.eesipr_value	= DMAC_M_RFRMER | DMAC_M_ECI | 0x017f009f,
+	.rmcr_value = 0x00000001,
+
+	.tx_check	= EESR_FTC ,
+	.eesr_err_check	= EESR_TWB | EESR_TABT | EESR_RABT | EESR_RDE |
+			  EESR_RFRMER | EESR_TFE | EESR_TDE | EESR_ECI,
+	.tx_error_check	= EESR_TWB | EESR_TABT | EESR_TDE | EESR_TFE,
+
+	.apr		= 1,
+	.mpr		= 1,
+	.tpauser	= 1,
+	.hw_swap	= 1,
+	.rpadir		= 1,
+	.rpadir_value	= 0x00020000, /* NET_IP_ALIGN assumed to be 2 */
+};
+#else
 /* SH7724 */
 static struct sh_eth_cpu_data sh_eth_my_cpu_data = {
 	.set_duplex	= sh_eth_set_duplex,
@@ -132,6 +187,8 @@ static struct sh_eth_cpu_data sh_eth_my_cpu_data = {
 	.rpadir		= 1,
 	.rpadir_value	= 0x00020000, /* NET_IP_ALIGN assumed to be 2 */
 };
+#endif /* CONFIG_ARCH_RZA1 */
+
 #elif defined(CONFIG_CPU_SUBTYPE_SH7757)
 #define SH_ETH_HAS_BOTH_MODULES	1
 #define SH_ETH_HAS_TSU	1
@@ -1102,7 +1159,7 @@ static int sh_eth_rx(struct net_device *ndev, u32 intr_status)
 		desc_status = edmac_to_cpu(mdp, rxdesc->status);
 		pkt_len = rxdesc->frame_length;
 
-#if defined(CONFIG_ARCH_R8A7740)
+#if defined(CONFIG_ARCH_R8A7740) || defined(CONFIG_ARCH_RZA1)
 		desc_status >>= 16;
 #endif
 

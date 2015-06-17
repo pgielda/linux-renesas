@@ -1,0 +1,2 @@
+# UAPI Header export list
+header-y += raa730300.h

@@ -1,7 +1,7 @@
 /*
  * MMCIF eMMC driver.
  *
- * Copyright (C) 2010 Renesas Solutions Corp.
+ * Copyright (C) 2010-2013 Renesas Solutions Corp.
  * Yusuke Goda <yusuke.goda.sx@renesas.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -62,6 +62,15 @@
 #include <linux/pm_runtime.h>
 #include <linux/spinlock.h>
 #include <linux/module.h>
+#ifdef CONFIG_RZA1_DMAE
+#include <linux/platform_data/dma-rza1.h>
+#endif
+
+#ifdef CONFIG_RZA1_DMAE
+#define sh_mmcif_mmc_filter	rza1dma_chan_filter
+#else
+#define sh_mmcif_mmc_filter	shdma_chan_filter
+#endif
 
 #define DRIVER_NAME	"sh_mmcif"
 #define DRIVER_VERSION	"2010-04-28"
@@ -391,7 +400,7 @@ static void sh_mmcif_request_dma(struct sh_mmcif_host *host,
 	dma_cap_zero(mask);
 	dma_cap_set(DMA_SLAVE, mask);
 
-	host->chan_tx = dma_request_channel(mask, shdma_chan_filter,
+	host->chan_tx = dma_request_channel(mask, sh_mmcif_mmc_filter,
 					    (void *)pdata->slave_id_tx);
 	dev_dbg(&host->pd->dev, "%s: TX: got channel %p\n", __func__,
 		host->chan_tx);
@@ -407,7 +416,7 @@ static void sh_mmcif_request_dma(struct sh_mmcif_host *host,
 	if (ret < 0)
 		goto ecfgtx;
 
-	host->chan_rx = dma_request_channel(mask, shdma_chan_filter,
+	host->chan_rx = dma_request_channel(mask, sh_mmcif_mmc_filter,
 					    (void *)pdata->slave_id_rx);
 	dev_dbg(&host->pd->dev, "%s: RX: got channel %p\n", __func__,
 		host->chan_rx);

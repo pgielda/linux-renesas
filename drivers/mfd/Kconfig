@@ -1114,6 +1114,13 @@ config MFD_AS3711
 	help
 	  Support for the AS3711 PMIC from AMS
 
+config MFD_RAA730300
+	bool "RAA730300 Monolithic programable analog IC"
+	depends on SPI_MASTER && GPIOLIB
+	help
+	  Smart Analog(RAA730300) is a front-end cirtuit for small signal
+	  sensors.
+
 endmenu
 endif
 

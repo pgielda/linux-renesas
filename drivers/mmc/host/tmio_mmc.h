@@ -1,6 +1,7 @@
 /*
  * linux/drivers/mmc/host/tmio_mmc.h
  *
+ * Copyright (C) 2013 Renesas Solutions Corp.
  * Copyright (C) 2007 Ian Molton
  * Copyright (C) 2004 Ian Molton
  *
@@ -34,8 +35,15 @@
 #define TMIO_MASK_ALL           0x837f031d
 #define TMIO_MASK_READOP  (TMIO_STAT_RXRDY | TMIO_STAT_DATAEND)
 #define TMIO_MASK_WRITEOP (TMIO_STAT_TXRQ | TMIO_STAT_DATAEND)
+#ifdef CONFIG_MMC_GENMAI_SD_CARD_DETECT
+#define TMIO_MASK_CMD     (TMIO_STAT_CMDRESPEND | TMIO_STAT_CMDTIMEOUT | \
+		TMIO_STAT_STOPBIT_ERR | \
+		TMIO_STAT_CARD_REMOVE | TMIO_STAT_CARD_INSERT)
+#else
 #define TMIO_MASK_CMD     (TMIO_STAT_CMDRESPEND | TMIO_STAT_CMDTIMEOUT | \
 		TMIO_STAT_CARD_REMOVE | TMIO_STAT_CARD_INSERT)
+#endif
+
 #define TMIO_MASK_IRQ     (TMIO_MASK_READOP | TMIO_MASK_WRITEOP | TMIO_MASK_CMD)
 
 struct tmio_mmc_data;

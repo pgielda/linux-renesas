@@ -1,7 +1,7 @@
 /*
  * Renesas SPI driver
  *
- * Copyright (C) 2012  Renesas Solutions Corp.
+ * Copyright (C) 2012-2013  Renesas Solutions Corp.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +22,10 @@
 #define __LINUX_SPI_RENESAS_SPI_H__
 
 struct rspi_plat_data {
+	u8 data_width; /* data register access width */
+	bool txmode;	/* tx only mode  */
+	bool spcr;	/* set parity register */
+
 	unsigned int dma_tx_id;
 	unsigned int dma_rx_id;
 

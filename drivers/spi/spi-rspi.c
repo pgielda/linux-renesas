@@ -1,10 +1,9 @@
 /*
  * SH RSPI driver
  *
- * Copyright (C) 2012  Renesas Solutions Corp.
+ * Copyright (C) 2011-2013  Renesas Solutions Corp.
  *
  * Based on spi-sh.c:
- * Copyright (C) 2011 Renesas Solutions Corp.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,6 +57,8 @@
 #define RSPI_SPCMD5		0x1a
 #define RSPI_SPCMD6		0x1c
 #define RSPI_SPCMD7		0x1e
+#define RSPI_SPBFCR		0x20
+#define RSPI_SPBFDR		0x22
 
 /* SPCR */
 #define SPCR_SPRIE		0x80
@@ -82,6 +83,7 @@
 
 /* SPSR */
 #define SPSR_SPRF		0x80
+#define SPSR_SPTE		0x40
 #define SPSR_SPTEF		0x20
 #define SPSR_PERF		0x08
 #define SPSR_MODF		0x04
@@ -96,7 +98,12 @@
 #define SPSSR_SPCP_MASK		0x07
 
 /* SPDCR */
-#define SPDCR_SPLW		0x20
+#define SPDCR_TXDMY		0x80
+#define SPDCR_SPLLWORD		(SPDCR_SPLW1 | SPDCR_SPLW0)
+#define SPDCR_SPLWORD		SPDCR_SPLW1
+#define SPDCR_SPLBYTE		SPDCR_SPLW0
+#define SPDCR_SPLW1		0x40
+#define SPDCR_SPLW0		0x20
 #define SPDCR_SPRDTD		0x10
 #define SPDCR_SLSEL1		0x08
 #define SPDCR_SLSEL0		0x04
@@ -135,6 +142,20 @@
 #define SPCMD_CPOL		0x0002
 #define SPCMD_CPHA		0x0001
 
+/* SPBFCR */
+#define SPBFCR_TXRST		0x0080
+#define SPBFCR_RXRST		0x0040
+
+/* SPBFDR */
+#define SPBFDR_RMASK		0x003f
+#define SPBFDR_TMASK		0x0f00
+
+#define DUMMY_DATA		0x00
+#define NUM_IRQ			3
+#define DRIVER_NAME		"sh_rspi"
+#define DRIVER_NAME_SIZE	16
+static char drv_name[16][NUM_IRQ][DRIVER_NAME_SIZE];
+
 struct rspi_data {
 	void __iomem *addr;
 	u32 max_speed_hz;
@@ -145,11 +166,22 @@ struct rspi_data {
 	spinlock_t lock;
 	struct clk *clk;
 	unsigned char spsr;
+	unsigned char sppcr;
+	unsigned char spdcr;
+	u16 spcmd;
+	u8 clk_delay;
+	u8 cs_negate_delay;
+	u8 next_access_delay;
+	u8 data_width;
+	u8 data_width_regval;
+	bool txmode;
+	bool spcr;
+	int irq[NUM_IRQ];
+	int irqn;
 
 	/* for dmaengine */
 	struct dma_chan *chan_tx;
 	struct dma_chan *chan_rx;
-	int irq;
 
 	unsigned dma_width_16bit:1;
 	unsigned dma_callbacked:1;
@@ -175,6 +207,24 @@ static u16 rspi_read16(struct rspi_data *rspi, u16 offset)
 	return ioread16(rspi->addr + offset);
 }
 
+static void rspi_write_data(struct rspi_data *rspi, u16 data)
+{
+	if (rspi->data_width == 8)
+		rspi_write8(rspi, (u8)data, RSPI_SPDR);
+	else if (rspi->data_width == 16)
+		rspi_write16(rspi, data, RSPI_SPDR);
+}
+
+static u16 rspi_read_data(struct rspi_data *rspi)
+{
+	if (rspi->data_width == 8)
+		return rspi_read8(rspi, RSPI_SPDR);
+	else if (rspi->data_width == 16)
+		return rspi_read16(rspi, RSPI_SPDR);
+	else
+		return 0;
+}
+
 static unsigned char rspi_calc_spbr(struct rspi_data *rspi)
 {
 	int tmp;
@@ -184,6 +234,16 @@ static unsigned char rspi_calc_spbr(struct rspi_data *rspi)
 	spbr = clamp(tmp, 0, 255);
 
 	return spbr;
+}
+static void rspi_clear_rxbuf( struct rspi_data *rspi )
+{
+	rspi_write8(rspi, rspi_read8(rspi, RSPI_SPBFCR) |   SPBFCR_RXRST,  RSPI_SPBFCR);
+	rspi_write8(rspi, rspi_read8(rspi, RSPI_SPBFCR) & (~SPBFCR_RXRST), RSPI_SPBFCR);
+}
+static void rspi_clear_txbuf( struct rspi_data *rspi )
+{
+	rspi_write8(rspi, rspi_read8(rspi, RSPI_SPBFCR) |   SPBFCR_TXRST,  RSPI_SPBFCR);
+	rspi_write8(rspi, rspi_read8(rspi, RSPI_SPBFCR) & (~SPBFCR_TXRST), RSPI_SPBFCR);
 }
 
 static void rspi_enable_irq(struct rspi_data *rspi, u8 enable)
@@ -220,27 +280,67 @@ static void rspi_negate_ssl(struct rspi_data *rspi)
 	rspi_write8(rspi, rspi_read8(rspi, RSPI_SPCR) & ~SPCR_SPE, RSPI_SPCR);
 }
 
+static void rspi_set_txmode(struct rspi_data *rspi)
+{
+	if (rspi->txmode)
+		rspi_write8(rspi, rspi_read8(rspi, RSPI_SPCR) | SPCR_TXMD,
+				RSPI_SPCR);
+}
+
+static void rspi_clear_txmode(struct rspi_data *rspi)
+{
+	if (rspi->txmode)
+		rspi_write8(rspi, rspi_read8(rspi, RSPI_SPCR) & ~SPCR_TXMD,
+				RSPI_SPCR);
+}
+
+static int rspi_setup_data_register_width(struct rspi_data *rspi,
+				      struct platform_device *pdev)
+{
+	struct rspi_plat_data *rspi_pd = pdev->dev.platform_data;
+
+	if (rspi_pd && rspi_pd->data_width) {
+		rspi->data_width = rspi_pd->data_width;
+		/* This version driver supports only 8bits width */
+		if (rspi_pd->data_width == 8) {
+			rspi->data_width_regval = SPDCR_SPLBYTE;
+			return 0;
+		} else {
+			return -1;
+		}
+		rspi->data_width_regval = 0;
+	} else {
+		/* Use 16bits width data access if a data_width value isn't */
+		/* defined in a platform data. */
+		rspi->data_width = 16;
+		rspi->data_width_regval = 0;
+	}
+
+	return 0;
+}
+
 static int rspi_set_config_register(struct rspi_data *rspi, int access_size)
 {
 	/* Sets output mode(CMOS) and MOSI signal(from previous transfer) */
-	rspi_write8(rspi, 0x00, RSPI_SPPCR);
+	rspi_write8(rspi, rspi->sppcr, RSPI_SPPCR);
 
 	/* Sets transfer bit rate */
 	rspi_write8(rspi, rspi_calc_spbr(rspi), RSPI_SPBR);
 
 	/* Sets number of frames to be used: 1 frame */
-	rspi_write8(rspi, 0x00, RSPI_SPDCR);
+	rspi_write8(rspi, rspi->spdcr, RSPI_SPDCR);
 
-	/* Sets RSPCK, SSL, next-access delay value */
-	rspi_write8(rspi, 0x00, RSPI_SPCKD);
-	rspi_write8(rspi, 0x00, RSPI_SSLND);
-	rspi_write8(rspi, 0x00, RSPI_SPND);
+	/* Sets delays for RSPCK, SSL negate and next-access */
+	rspi_write8(rspi, rspi->clk_delay, RSPI_SPCKD);
+	rspi_write8(rspi, rspi->cs_negate_delay, RSPI_SSLND);
+	rspi_write8(rspi, rspi->next_access_delay, RSPI_SPND);
 
 	/* Sets parity, interrupt mask */
-	rspi_write8(rspi, 0x00, RSPI_SPCR2);
+	if (rspi->spcr)
+		rspi_write8(rspi, 0x00, RSPI_SPCR2);
 
 	/* Sets SPCMD */
-	rspi_write16(rspi, SPCMD_SPB_8_TO_16(access_size) | SPCMD_SSLKP,
+	rspi_write16(rspi, SPCMD_SPB_8_TO_16(access_size) | rspi->spcmd,
 		     RSPI_SPCMD0);
 
 	/* Sets RSPI mode */
@@ -255,24 +355,44 @@ static int rspi_send_pio(struct rspi_data *rspi, struct spi_message *mesg,
 	int remain = t->len;
 	u8 *data;
 
+	if( rspi->sppcr & SPPCR_SPLP ) {
+		/* loop back mode */
+		rspi_clear_txbuf(rspi);
+		rspi_clear_rxbuf(rspi);
+	}
+
 	data = (u8 *)t->tx_buf;
 	while (remain > 0) {
-		rspi_write8(rspi, rspi_read8(rspi, RSPI_SPCR) | SPCR_TXMD,
-			    RSPI_SPCR);
+		rspi_set_txmode(rspi);
 
 		if (rspi_wait_for_interrupt(rspi, SPSR_SPTEF, SPCR_SPTIE) < 0) {
 			dev_err(&rspi->master->dev,
 				"%s: tx empty timeout\n", __func__);
 			return -ETIMEDOUT;
 		}
-
-		rspi_write16(rspi, *data, RSPI_SPDR);
+		if (!rspi->txmode && remain != t->len) {
+			if( !(rspi->sppcr & SPPCR_SPLP) ) {
+				rspi_wait_for_interrupt(rspi, SPSR_SPRF, SPCR_SPRIE);
+				rspi_read_data(rspi); /* dummy read */
+			}
+		}
+		rspi_write_data(rspi, *data);
 		data++;
 		remain--;
 	}
 
 	/* Waiting for the last transmition */
 	rspi_wait_for_interrupt(rspi, SPSR_SPTEF, SPCR_SPTIE);
+
+	if (rspi_wait_for_interrupt(rspi, SPSR_SPRF, SPCR_SPRIE) < 0) {
+		dev_err(&rspi->master->dev,
+			"%s: receive timeout\n", __func__);
+		return -ETIMEDOUT;
+	}
+	if (!rspi->txmode) {
+		if( !(rspi->sppcr & SPPCR_SPLP) )
+			rspi_read_data(rspi); /* dummy read */
+	}
 
 	return 0;
 }
@@ -329,7 +449,7 @@ static int rspi_send_dma(struct rspi_data *rspi, struct spi_transfer *t)
 	void *buf = NULL;
 	struct dma_async_tx_descriptor *desc;
 	unsigned len;
-	int ret = 0;
+	int i, ret = 0;
 
 	if (rspi->dma_width_16bit) {
 		/*
@@ -364,9 +484,10 @@ static int rspi_send_dma(struct rspi_data *rspi, struct spi_transfer *t)
 	 * DMAC needs SPTIE, but if SPTIE is set, this IRQ routine will be
 	 * called. So, this driver disables the IRQ while DMA transfer.
 	 */
-	disable_irq(rspi->irq);
+	for (i = 0; i < rspi->irqn; i++)
+		disable_irq(rspi->irq[i]);
 
-	rspi_write8(rspi, rspi_read8(rspi, RSPI_SPCR) | SPCR_TXMD, RSPI_SPCR);
+	rspi_set_txmode(rspi);
 	rspi_enable_irq(rspi, SPCR_SPTIE);
 	rspi->dma_callbacked = 0;
 
@@ -383,7 +504,8 @@ static int rspi_send_dma(struct rspi_data *rspi, struct spi_transfer *t)
 		ret = -ETIMEDOUT;
 	rspi_disable_irq(rspi, SPCR_SPTIE);
 
-	enable_irq(rspi->irq);
+	for (i = 0; i < rspi->irqn; i++)
+		enable_irq(rspi->irq[i]);
 
 end:
 	rspi_dma_unmap_sg(&sg, rspi->chan_tx, DMA_TO_DEVICE);
@@ -399,11 +521,12 @@ static void rspi_receive_init(struct rspi_data *rspi)
 	unsigned char spsr;
 
 	spsr = rspi_read8(rspi, RSPI_SPSR);
-	if (spsr & SPSR_SPRF)
-		rspi_read16(rspi, RSPI_SPDR);	/* dummy read */
+	if( (spsr & SPSR_SPRF) && !(rspi->sppcr & SPPCR_SPLP) )
+		rspi_read_data(rspi); /* dummy read */
+
 	if (spsr & SPSR_OVRF)
 		rspi_write8(rspi, rspi_read8(rspi, RSPI_SPSR) & ~SPSR_OVRF,
-			    RSPI_SPCR);
+			    RSPI_SPSR);
 }
 
 static int rspi_receive_pio(struct rspi_data *rspi, struct spi_message *mesg,
@@ -416,8 +539,7 @@ static int rspi_receive_pio(struct rspi_data *rspi, struct spi_message *mesg,
 
 	data = (u8 *)t->rx_buf;
 	while (remain > 0) {
-		rspi_write8(rspi, rspi_read8(rspi, RSPI_SPCR) & ~SPCR_TXMD,
-			    RSPI_SPCR);
+		rspi_clear_txmode(rspi);
 
 		if (rspi_wait_for_interrupt(rspi, SPSR_SPTEF, SPCR_SPTIE) < 0) {
 			dev_err(&rspi->master->dev,
@@ -425,18 +547,21 @@ static int rspi_receive_pio(struct rspi_data *rspi, struct spi_message *mesg,
 			return -ETIMEDOUT;
 		}
 		/* dummy write for generate clock */
-		rspi_write16(rspi, 0x00, RSPI_SPDR);
+		rspi_write_data(rspi, DUMMY_DATA);
 
 		if (rspi_wait_for_interrupt(rspi, SPSR_SPRF, SPCR_SPRIE) < 0) {
 			dev_err(&rspi->master->dev,
 				"%s: receive timeout\n", __func__);
 			return -ETIMEDOUT;
 		}
-		/* SPDR allows 16 or 32-bit access only */
-		*data = (u8)rspi_read16(rspi, RSPI_SPDR);
-
+		*data = (u8)rspi_read_data(rspi);
 		data++;
 		remain--;
+	}
+	if( rspi->sppcr & SPPCR_SPLP ) {
+		/* loop back mode */
+		rspi_clear_txbuf(rspi);
+		rspi_clear_rxbuf(rspi);
 	}
 
 	return 0;
@@ -448,7 +573,7 @@ static int rspi_receive_dma(struct rspi_data *rspi, struct spi_transfer *t)
 	void *dummy = NULL, *rx_buf = NULL;
 	struct dma_async_tx_descriptor *desc, *desc_dummy;
 	unsigned len;
-	int ret = 0;
+	int i, ret = 0;
 
 	if (rspi->dma_width_16bit) {
 		/*
@@ -462,7 +587,7 @@ static int rspi_receive_dma(struct rspi_data *rspi, struct spi_transfer *t)
 		rx_buf = kmalloc(len, GFP_KERNEL);
 		if (!rx_buf)
 			return -ENOMEM;
-	 } else {
+	} else {
 		len = t->len;
 		rx_buf = t->rx_buf;
 	}
@@ -505,9 +630,10 @@ static int rspi_receive_dma(struct rspi_data *rspi, struct spi_transfer *t)
 	 * DMAC needs SPTIE, but if SPTIE is set, this IRQ routine will be
 	 * called. So, this driver disables the IRQ while DMA transfer.
 	 */
-	disable_irq(rspi->irq);
+	for (i = 0; i < rspi->irqn; i++)
+		disable_irq(rspi->irq[i]);
 
-	rspi_write8(rspi, rspi_read8(rspi, RSPI_SPCR) & ~SPCR_TXMD, RSPI_SPCR);
+	rspi_clear_txmode(rspi);
 	rspi_enable_irq(rspi, SPCR_SPTIE | SPCR_SPRIE);
 	rspi->dma_callbacked = 0;
 
@@ -528,7 +654,8 @@ static int rspi_receive_dma(struct rspi_data *rspi, struct spi_transfer *t)
 		ret = -ETIMEDOUT;
 	rspi_disable_irq(rspi, SPCR_SPTIE | SPCR_SPRIE);
 
-	enable_irq(rspi->irq);
+	for (i = 0; i < rspi->irqn; i++)
+		enable_irq(rspi->irq[i]);
 
 end:
 	rspi_dma_unmap_sg(&sg, rspi->chan_rx, DMA_FROM_DEVICE);
@@ -598,6 +725,7 @@ static void rspi_work(struct work_struct *work)
 
 		spin_lock_irqsave(&rspi->lock, flags);
 	}
+	spin_unlock_irqrestore(&rspi->lock, flags);
 
 	return;
 
@@ -613,6 +741,33 @@ static int rspi_setup(struct spi_device *spi)
 	if (!spi->bits_per_word)
 		spi->bits_per_word = 8;
 	rspi->max_speed_hz = spi->max_speed_hz;
+
+	rspi->spcmd = SPCMD_SSLKP;
+
+	if (spi->mode & SPI_CPOL)
+		rspi->spcmd |= SPCMD_CPOL;
+
+	if (spi->mode & SPI_CPHA)
+		rspi->spcmd |= SPCMD_CPHA;
+
+	rspi->sppcr = 0;
+	if (spi->mode & SPI_LOOP)
+		rspi->sppcr |= SPPCR_SPLP;
+
+	rspi->spdcr = rspi->data_width_regval;
+
+	if (spi->clk_delay) {
+		rspi->clk_delay = spi->clk_delay;
+		rspi->spcmd |= SPCMD_SCKDEN;
+	}
+	if (spi->cs_negate_delay) {
+		rspi->cs_negate_delay = spi->cs_negate_delay;
+		rspi->spcmd |= SPCMD_SLNDEN;
+	}
+	if (spi->next_access_delay) {
+		rspi->next_access_delay = spi->next_access_delay;
+		rspi->spcmd |= SPCMD_SPNDEN;
+	}
 
 	rspi_set_config_register(rspi, 8);
 
@@ -720,10 +875,12 @@ static void rspi_release_dma(struct rspi_data *rspi)
 static int rspi_remove(struct platform_device *pdev)
 {
 	struct rspi_data *rspi = dev_get_drvdata(&pdev->dev);
+	int i;
 
 	spi_unregister_master(rspi->master);
 	rspi_release_dma(rspi);
-	free_irq(platform_get_irq(pdev, 0), rspi);
+	for (i = 0; i < rspi->irqn; i++)
+		free_irq(rspi->irq[i], rspi);
 	clk_put(rspi->clk);
 	iounmap(rspi->addr);
 	spi_master_put(rspi->master);
@@ -736,7 +893,8 @@ static int rspi_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct spi_master *master;
 	struct rspi_data *rspi;
-	int ret, irq;
+	int ret, irq, i, j;
+	struct rspi_plat_data *rspi_pd;
 	char clk_name[16];
 
 	/* get base addr */
@@ -744,12 +902,6 @@ static int rspi_probe(struct platform_device *pdev)
 	if (unlikely(res == NULL)) {
 		dev_err(&pdev->dev, "invalid resource\n");
 		return -EINVAL;
-	}
-
-	irq = platform_get_irq(pdev, 0);
-	if (irq < 0) {
-		dev_err(&pdev->dev, "platform_get_irq error\n");
-		return -ENODEV;
 	}
 
 	master = spi_alloc_master(&pdev->dev, sizeof(struct rspi_data));
@@ -788,14 +940,35 @@ static int rspi_probe(struct platform_device *pdev)
 	master->setup = rspi_setup;
 	master->transfer = rspi_transfer;
 	master->cleanup = rspi_cleanup;
+	master->mode_bits = (SPI_CPHA | SPI_CPOL | SPI_LOOP);
 
-	ret = request_irq(irq, rspi_irq, 0, dev_name(&pdev->dev), rspi);
+	i = j = 0;
+	while ((res = platform_get_resource(pdev, IORESOURCE_IRQ, i++))) {
+		for (irq = res->start; irq <= res->end; irq++) {
+			if (j >= NUM_IRQ) {
+				dev_err(&pdev->dev, "irq resource is over\n");
+				ret = -ENODEV;
+				goto error3;
+			}
+			snprintf(drv_name[pdev->id][j], DRIVER_NAME_SIZE,
+				 "%s.%d-%d", DRIVER_NAME, pdev->id, j);
+			ret = request_irq(irq, rspi_irq, IRQF_DISABLED,
+					  drv_name[pdev->id][j], rspi);
+			if (ret < 0) {
+				dev_err(&pdev->dev, "request_irq error\n");
+				goto error3;
+			}
+			rspi->irq[j++] = irq;
+		}
+	}
+	rspi->irqn = j;
+
+	ret = rspi_setup_data_register_width(rspi, pdev);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "request_irq error\n");
-		goto error3;
+		dev_err(&pdev->dev, "rspi setup invalid data width.\n");
+		goto error4;
 	}
 
-	rspi->irq = irq;
 	ret = rspi_request_dma(rspi, pdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "rspi_request_dma failed.\n");
@@ -808,14 +981,19 @@ static int rspi_probe(struct platform_device *pdev)
 		goto error4;
 	}
 
+	rspi_pd = pdev->dev.platform_data;
+	rspi->spcr = rspi_pd->spcr;
+	rspi->txmode = rspi_pd->txmode;
+
 	dev_info(&pdev->dev, "probed\n");
 
 	return 0;
 
 error4:
 	rspi_release_dma(rspi);
-	free_irq(irq, rspi);
 error3:
+	for (i = 0; i < j; i++)
+		free_irq(rspi->irq[i], rspi);
 	clk_put(rspi->clk);
 error2:
 	iounmap(rspi->addr);

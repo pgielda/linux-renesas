@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2013 Renesas Solutions Corp.
  * Copyright (C) 2005 David Brownell
  *
  * This program is free software; you can redistribute it and/or modify
@@ -57,6 +58,12 @@ extern struct bus_type spi_bus_type;
  * @modalias: Name of the driver to use with this device, or an alias
  *	for that name.  This appears in the sysfs "modalias" attribute
  *	for driver coldplugging, and in uevents used for hotplugging
+ * @clk_delay: The length of delay between edge of SPI Enable signal and
+ *	first clock edge.
+ * @cs_negate_delay: The length of delay between negated SPI Enable signal
+ *	and last clock edge.
+ * @next_access_delay: The length of delay until starting next SPI Enable
+ *	signal.
  *
  * A @spi_device is used to interchange data between an SPI slave
  * (usually a discrete chip) and CPU memory.
@@ -91,6 +98,9 @@ struct spi_device {
 	void			*controller_data;
 	char			modalias[SPI_NAME_SIZE];
 	int			cs_gpio;	/* chip select gpio */
+	u8			clk_delay;
+	u8			cs_negate_delay;
+	u8			next_access_delay;
 
 	/*
 	 * likely need more hooks for more protocol options affecting how
@@ -810,6 +820,13 @@ struct spi_board_info {
 	 * where the default of SPI_CS_HIGH = 0 is wrong.
 	 */
 	u8		mode;
+
+	/*
+	 * The delay values for SPI clock timing.
+	 */
+	u8		clk_delay;
+	u8		cs_negate_delay;
+	u8		next_access_delay;
 
 	/* ... may need additional spi_device chip config data here.
 	 * avoid stuff protocol drivers can set; but include stuff

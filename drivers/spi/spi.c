@@ -1,6 +1,7 @@
 /*
  * SPI init/core code
  *
+ * Copyright (C) 2013 Renesas Solutions Corp.
  * Copyright (C) 2005 David Brownell
  * Copyright (C) 2008 Secret Lab Technologies Ltd.
  *
@@ -454,6 +455,9 @@ struct spi_device *spi_new_device(struct spi_master *master,
 	proxy->dev.platform_data = (void *) chip->platform_data;
 	proxy->controller_data = chip->controller_data;
 	proxy->controller_state = NULL;
+	proxy->clk_delay = chip->clk_delay;
+	proxy->cs_negate_delay = chip->cs_negate_delay;
+	proxy->next_access_delay = chip->next_access_delay;
 
 	status = spi_add_device(proxy);
 	if (status < 0) {

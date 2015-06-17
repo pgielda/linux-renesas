@@ -449,6 +449,19 @@ config MMC_SDHI
 	  This provides support for the SDHI SD/SDIO controller found in
 	  SuperH and ARM SH-Mobile SoCs
 
+config MMC_GENMAI_SD_CARD_DETECT
+	bool "Apply detect process of SD card in GENMAI board."
+	depends on MACH_RSKRZA1 && MMC_SDHI
+	select RZA1_DMAE
+	default y
+	help
+	  This provides support for detect process of SD card in GENMAI board.
+	  If repair the board, you can select to N.
+	  In the repair board, even no repair board, there is no problem to 
+	  selection of Y.
+
+	  If unsure, say Y.
+	  
 config MMC_CB710
 	tristate "ENE CB710 MMC/SD Interface support"
 	depends on PCI

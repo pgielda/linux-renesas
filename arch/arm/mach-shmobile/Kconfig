@@ -38,6 +38,15 @@ config ARCH_EMEV2
 	select ARM_GIC
 	select CPU_V7
 
+config ARCH_RZA1
+	bool "RZA1"
+	select ARCH_WANT_OPTIONAL_GPIOLIB
+	select ARM_GIC
+	select CPU_V7
+	select SH_CLK_CPG
+	select I2C
+	select SH_TIMER_MTU2
+
 comment "SH-Mobile Board Type"
 
 config MACH_AP4EVB
@@ -116,6 +125,13 @@ config MACH_KZM9G
 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
 	select USE_OF
 
+config MACH_RSKRZA1
+	bool "RSKRZA1 board"
+	depends on ARCH_RZA1
+	select ARCH_REQUIRE_GPIOLIB
+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+	select USE_OF
+
 comment "SH-Mobile System Configuration"
 
 config CPU_HAS_INTEVT
@@ -181,6 +197,11 @@ config EM_TIMER_STI
 	default y
 	help
 	  This enables build of the STI timer driver.
+
+config SH_TIMER_MTU2
+	bool "MTU2 timer driver"
+	help
+	  This enables build of the MTU2 timer driver.
 
 endmenu
 

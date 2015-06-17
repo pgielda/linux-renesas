@@ -2,7 +2,7 @@
  *  SuperH Ethernet device driver
  *
  *  Copyright (C) 2006-2012 Nobuhiro Iwamatsu
- *  Copyright (C) 2008-2012 Renesas Solutions Corp.
+ *  Copyright (C) 2008-2013 Renesas Solutions Corp.
  *
  *  This program is free software; you can redistribute it and/or modify it
  *  under the terms and conditions of the GNU General Public License,
@@ -386,7 +386,7 @@ static const u16 sh_eth_offset_fast_sh3_sh2[SH_ETH_MAX_REGISTER_OFFSET] = {
  * Register's bits
  */
 #if defined(CONFIG_CPU_SUBTYPE_SH7734) || defined(CONFIG_CPU_SUBTYPE_SH7763) ||\
-    defined(CONFIG_ARCH_R8A7740)
+    defined(CONFIG_ARCH_R8A7740) || defined(CONFIG_ARCH_RZA1)
 /* EDSR */
 enum EDSR_BIT {
 	EDSR_ENT = 0x01, EDSR_ENR = 0x02,

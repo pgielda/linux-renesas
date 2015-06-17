@@ -311,9 +311,15 @@ config SPI_PXA2XX_PCI
 
 config SPI_RSPI
 	tristate "Renesas RSPI controller"
-	depends on SUPERH
+	depends on (SUPERH || ARCH_RZA1)
 	help
 	  SPI driver for Renesas RSPI blocks.
+
+config SPI_SH_SPIBSC
+	tristate "Renesas SPIBSC controller for RZA1"
+	depends on ARCH_RZA1
+	help
+	  SPIBSC driver for Renesas SPIBSC blocks.
 
 config SPI_S3C24XX
 	tristate "Samsung S3C24XX series SPI"

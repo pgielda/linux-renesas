@@ -7,6 +7,7 @@ header-y += asm-generic/
 header-y += linux/
 header-y += sound/
 header-y += mtd/
+header-y += mfd/
 header-y += rdma/
 header-y += video/
 header-y += drm/

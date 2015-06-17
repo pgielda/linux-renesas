@@ -1,6 +1,7 @@
 /*
  * linux/drivers/mmc/host/tmio_mmc_pio.c
  *
+ * Copyright (C) 2013 Renesas Solutions Corp.
  * Copyright (C) 2011 Guennadi Liakhovetski
  * Copyright (C) 2007 Ian Molton
  * Copyright (C) 2004 Ian Molton
@@ -524,10 +525,17 @@ static void tmio_mmc_cmd_irq(struct tmio_mmc_host *host,
 		cmd->resp[0] = cmd->resp[3];
 	}
 
+#ifdef CONFIG_MMC_GENMAI_SD_CARD_DETECT
+	if (stat & (TMIO_STAT_CMDTIMEOUT | TMIO_STAT_STOPBIT_ERR))
+		cmd->error = -ETIMEDOUT;
+	else if (stat & TMIO_STAT_CRCFAIL && cmd->flags & MMC_RSP_CRC)
+		cmd->error = -EILSEQ;
+#else
 	if (stat & TMIO_STAT_CMDTIMEOUT)
 		cmd->error = -ETIMEDOUT;
 	else if (stat & TMIO_STAT_CRCFAIL && cmd->flags & MMC_RSP_CRC)
 		cmd->error = -EILSEQ;
+#endif
 
 	/* If there is data to handle we enable data IRQs here, and
 	 * we will ultimatley finish the request in the data_end handler.
@@ -598,13 +606,24 @@ static bool __tmio_mmc_sdcard_irq(struct tmio_mmc_host *host,
 				 int ireg, int status)
 {
 	/* Command completion */
+#ifdef CONFIG_MMC_GENMAI_SD_CARD_DETECT
+	if (ireg & (TMIO_STAT_CMDRESPEND | TMIO_STAT_CMDTIMEOUT | 
+				TMIO_STAT_STOPBIT_ERR)) {
+		tmio_mmc_ack_mmc_irqs(host,
+				 TMIO_STAT_CMDRESPEND | TMIO_STAT_CMDTIMEOUT |
+			     TMIO_STAT_STOPBIT_ERR);
+		tmio_mmc_cmd_irq(host, status);
+		return true;
+	}
+#else
 	if (ireg & (TMIO_STAT_CMDRESPEND | TMIO_STAT_CMDTIMEOUT)) {
 		tmio_mmc_ack_mmc_irqs(host,
-			     TMIO_STAT_CMDRESPEND |
+				 TMIO_STAT_CMDRESPEND |
 			     TMIO_STAT_CMDTIMEOUT);
 		tmio_mmc_cmd_irq(host, status);
 		return true;
 	}
+#endif
 
 	/* Data transfer */
 	if (ireg & (TMIO_STAT_RXRDY | TMIO_STAT_TXRQ)) {

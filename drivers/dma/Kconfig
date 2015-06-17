@@ -182,6 +182,14 @@ config SH_DMAE
 	help
 	  Enable support for the Renesas SuperH DMA controllers.
 
+config RZA1_DMAE
+	tristate "Renesas RZA1 DMAC support"
+	depends on (ARM && ARCH_SHMOBILE && ARCH_RZA1)
+	depends on !SH_DMA_API
+	select DMA_ENGINE
+	help
+	  Enable support for the Renesas RZA1 DMA controllers.
+
 config COH901318
 	bool "ST-Ericsson COH901318 DMA support"
 	select DMA_ENGINE
