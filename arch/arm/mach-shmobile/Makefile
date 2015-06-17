@@ -50,6 +50,7 @@ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
 obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
 obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
 obj-$(CONFIG_MACH_RSKRZA1)	+= board-rskrza1.o
+obj-$(CONFIG_MACH_DIMMRZA1H)	+= board-dimmrza1h.o
 
 # Framework support
 obj-$(CONFIG_SMP)		+= $(smp-y)

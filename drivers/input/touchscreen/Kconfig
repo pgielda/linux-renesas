@@ -180,6 +180,23 @@ config TOUCHSCREEN_DA9034
 	  To compile this driver as a module, choose M here: the
 	  module will be called da9034-ts.
 
+config TOUCHSCREEN_AR1020
+	tristate "Microchip AR1020 touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have an AR1020 touchscreen and
+	  want to enable support for it.
+
+config TOUCHSCREEN_AR1020_AUTO_CALIBRATE
+       bool "The AR1020 chip has some flaws. When activated this option tries to work around those."
+       default n
+       depends on TOUCHSCREEN_AR1020
+
+config TOUCHSCREEN_AR1020_ANDROID_CALIBRATION
+       bool "Accept Android calibration data as module parameter."
+       default n
+       depends on TOUCHSCREEN_AR1020
+
 config TOUCHSCREEN_DA9052
 	tristate "Dialog DA9052/DA9053 TSI"
 	depends on PMIC_DA9052

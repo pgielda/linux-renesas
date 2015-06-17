@@ -148,7 +148,7 @@ struct clk div4_clks[DIV4_NR] = {
 enum { MSTP51, MSTP50,
 	MSTP71, MSTP70,
 	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
-	MSTP33, MSTP67, MSTP60,
+	MSTP32, MSTP33, MSTP67, MSTP60,
 	MSTP84,
 	MSTP92, MSTP93,
 #if defined(CONFIG_FB_VDC5)
@@ -179,6 +179,7 @@ static struct clk mstp_clks[MSTP_NR] = {
 	[MSTP42] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 2, 0),   /* SCIF5 */
 	[MSTP41] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 1, 0),   /* SCIF6 */
 	[MSTP40] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 0, 0),   /* SCIF7 */
+	[MSTP32] = SH_CLK_MSTP8(&peripheral1_clk, STBCR3, 2, 0),   /* CAN */
 	[MSTP33] = SH_CLK_MSTP8(&peripheral0_clk, STBCR3, 3, 0),   /* MTU2 */
 	[MSTP67] = SH_CLK_MSTP8(&peripheral1_clk, STBCR6, 7, 0),   /* ADC */
 	[MSTP60] = SH_CLK_MSTP8(&r_clk, STBCR6, 0, 0),		   /* RTC */
@@ -243,6 +244,7 @@ static struct clk_lookup lookups[] = {
 	CLKDEV_CON_ID("rspi2", &mstp_clks[MSTP105]),
 	CLKDEV_CON_ID("rspi3", &mstp_clks[MSTP104]),
 	CLKDEV_CON_ID("rspi4", &mstp_clks[MSTP103]),
+	CLKDEV_CON_ID("can",  &mstp_clks[MSTP32]),
 	CLKDEV_CON_ID("scux", &mstp_clks[MSTP81]),	/* SCUX */
 	CLKDEV_CON_ID("ssif0", &mstp_clks[MSTP115]),	/* SSIF0 */
 #if defined(CONFIG_FB_VDC5)

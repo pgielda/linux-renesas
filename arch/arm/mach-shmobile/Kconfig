@@ -132,6 +132,13 @@ config MACH_RSKRZA1
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
 	select USE_OF
 
+config MACH_DIMMRZA1H
+	bool "DIMM-RZA1H board"
+	depends on ARCH_RZA1
+	select ARCH_REQUIRE_GPIOLIB
+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+	select USE_OF
+
 comment "SH-Mobile System Configuration"
 
 config CPU_HAS_INTEVT

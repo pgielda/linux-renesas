@@ -906,16 +906,6 @@ static void riic_master_kick_transmit(struct riic_data *rd)
 	riic_write_pkt_buf(rd);
 }
 
-static void riic_read_receive_data(struct riic_data *rd, int clear_wait)
-{
-	struct riic_core_packet *pkt = rd->pkt;
-	unsigned char *buf = pkt->data;
-
-	buf[pkt->buf_idx++] = riic_read(rd, RIIC_ICDRR);
-	if (clear_wait)
-		riic_clear_bit(rd, ICMR3_WAIT, RIIC_ICMR3);
-}
-
 static void riic_send_start_cond(struct riic_data *rd, int restart)
 {
 	riic_set_bit(rd, ICIER_STIE, RIIC_ICIER);
@@ -943,6 +933,17 @@ static int riic_wait_for_icsr2(struct riic_data *rd, unsigned short bit)
 		bit, riic_read(rd, RIIC_ICSR2), riic_read(rd, RIIC_ICCR2));
 
 	return -ETIMEDOUT;
+}
+
+static void riic_read_receive_data(struct riic_data *rd, int clear_wait)
+{
+	struct riic_core_packet *pkt = rd->pkt;
+	unsigned char *buf = pkt->data;
+
+	riic_wait_for_icsr2(rd, ICSR2_RDRF);
+	buf[pkt->buf_idx++] = riic_read(rd, RIIC_ICDRR);
+	if (clear_wait)
+		riic_clear_bit(rd, ICMR3_WAIT, RIIC_ICMR3);
 }
 
 static void riic_packet_receive(struct riic_data *rd)
@@ -1312,7 +1313,7 @@ static int riic_probe(struct platform_device *pdev)
 		goto clean_up;
 	}
 
-#ifdef CONFIG_ARCH_RZA1
+#ifdef CONFIG_MACH_RSKRZA1
 	/* I2C pfc pin assign after resetting. */
 	rskrza1_board_i2c_pfc_assign(pdev->id);
 #endif

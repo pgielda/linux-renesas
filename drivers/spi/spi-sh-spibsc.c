@@ -442,19 +442,13 @@ static int spibsc_do_send_data(struct spibsc_priv *sbsc, const u8 *data, int len
 	int ret, unit, sslkp = 1;
 
 	while (len > 0) {
-		if (len >= 4) {
+
+		if (len >= 4)
 			unit = 4;
-			smenr = SMENR_SPIDE(SPIDE_32BITS) |
-					SMENR_SPIDB(sbsc->bitw);
-		} else {
+		else
 			unit = len;
-			if (unit >= 2)
-				smenr = SMENR_SPIDE(SPIDE_16BITS) |
-						SMENR_SPIDB(sbsc->bitw);
-			else
-				smenr = SMENR_SPIDE(SPIDE_8BITS) |
-						SMENR_SPIDB(sbsc->bitw);
-		}
+
+		smenr = SMENR_SPIDE(SPIDE_32BITS) | SMENR_SPIDB(sbsc->bitw);
 
 		/* set 4bytes data, bit stream */
 		smwdr0 = *data++;
@@ -506,19 +500,13 @@ static int spibsc_do_receive_data(struct spibsc_priv *sbsc, u8 *data, int len)
 	int ret, unit, sslkp = 1;
 
 	while (len > 0) {
-		if (len >= 4) {
+
+		if (len >= 4)
 			unit = 4;
-			smenr = SMENR_SPIDE(SPIDE_32BITS) |
-						SMENR_SPIDB(sbsc->bitw);
-		} else {
+		else
 			unit = len;
-			if (unit >= 2)
-				smenr = SMENR_SPIDE(SPIDE_16BITS) |
-						SMENR_SPIDB(sbsc->bitw);
-			else
-				smenr = SMENR_SPIDE(SPIDE_8BITS) |
-						SMENR_SPIDB(sbsc->bitw);
-		}
+
+		smenr = SMENR_SPIDE(SPIDE_32BITS) | SMENR_SPIDB(sbsc->bitw);
 
 		len -= unit;
 		if (len <= 0)

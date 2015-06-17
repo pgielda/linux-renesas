@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mutex.h>
+#include <linux/delay.h>
 #include <mach/rza1.h>
 
 #define GPIO_CHIP_NAME "RZA1_INTERNAL_PFC"
@@ -102,6 +103,9 @@ static int set_direction(unsigned int port, int bit, enum pfc_direction dir)
 	if (dir == DIR_IN) {
 		bit_modify(PM(port), bit, true);
 		bit_modify(PIBC(port), bit, true);
+	} else if (dir == DIR_LVDS) {
+		bit_modify(PM(port), bit, true);
+		bit_modify(PIBC(port), bit, false);
 	} else {
 		bit_modify(PM(port), bit, false);
 		bit_modify(PIBC(port), bit, false);
@@ -190,25 +194,25 @@ static const char * const gpio_names[] = {
 	"P1_9", "P1_10", "P1_11", "P1_12", "P1_13", "P1_14", "P1_15",
 	"P2_0", "P2_1", "P2_2", "P2_3", "P2_4", "P2_5", "P2_6", "P2_7", "P2_8",
 	"P2_9", "P2_10", "P2_11", "P2_12", "P2_13", "P2_14", "P2_15",
-	"P3_0", "P3_1", "P3_2", "P3_3", "P3_4", "P3_5", "P3_6", "P3_7", "P3_8",
+	"P3_0", "P3_1", "P3_2", "TP2", "P3_4", "P3_5", "P3_6", "P3_7", "P3_8",
 	"P3_9", "P3_10", "P3_11", "P3_12", "P3_13", "P3_14", "P3_15",
-	"P4_0", "P4_1", "P4_2", "P4_3", "P4_4", "P4_5", "P4_6", "P4_7", "P4_8",
+	"GPIO2", "GPIO3", "GPIO4", "GPIO5", "P4_4", "P4_5", "P4_6", "P4_7", "P4_8",
 	"P4_9", "P4_10", "P4_11", "P4_12", "P4_13", "P4_14", "P4_15",
 	"P5_0", "P5_1", "P5_2", "P5_3", "P5_4", "P5_5", "P5_6", "P5_7", "P5_8",
 	"P5_9", "P5_10",
-	"P6_0", "P6_1", "P6_2", "P6_3", "P6_4", "P6_5", "P6_6", "P6_7", "P6_8",
-	"P6_9", "P6_10", "P6_11", "P6_12", "P6_13", "P6_14", "P6_15",
+	"P6_0", "P6_1", "TP3", "GPIO0", "GPIO1", "USBH_PENn", "P6_6", "P6_7", "P6_8",
+	"LCD0_DON", "USBH_OCn", "P6_11", "P6_12", "P6_13", "P6_14", "P6_15",
 	"P7_0", "P7_1", "P7_2", "P7_3", "P7_4", "P7_5", "P7_6", "P7_7", "P7_8",
 	"P7_9", "P7_10", "P7_11", "P7_12", "P7_13", "P7_14", "P7_15",
-	"P8_0", "P8_1", "P8_2", "P8_3", "P8_4", "P8_5", "P8_6", "P8_7", "P8_8",
-	"P8_9", "P8_10", "P8_11", "P8_12", "P8_13", "P8_14", "P8_15",
+	"P8_0", "P8_1", "TP1", "GPIO_JTAG", "P8_4", "P8_5", "P8_6", "P8_7", "P8_8",
+	"P8_9", "P8_10", "LED_GREEN", "LED_RED", "P8_13", "P8_14", "P8_15",
 	"P9_0", "P9_1", "P9_2", "P9_3", "P9_4", "P9_5", "P9_6", "P9_7",
 	"P10_0", "P10_1", "P10_2", "P10_3", "P10_4", "P10_5", "P10_6", "P10_7",
 	"P10_8", "P10_9", "P10_10", "P10_11", "P10_12", "P10_13", "P10_14",
 	"P10_15",
 	"P11_0", "P11_1", "P11_2", "P11_3", "P11_4", "P11_5", "P11_6", "P11_7",
-	"P11_8", "P11_9", "P11_10", "P11_11", "P11_12", "P11_13", "P11_14",
-	"P11_15",
+	"P11_8", "P11_9", "P11_10", "P11_11", "GPIO6", "GPIO7", "GPIO8",
+	"GPIO9",
 };
 
 static struct gpio_chip chip = {
@@ -272,11 +276,17 @@ int rza1_pfc_pin_assign(enum pfc_pin_number pinnum, enum pfc_mode mode,
 	int port, bit = (int)pinnum;
 
 	port = get_port_bitshift(&bit);
-	if (dir == DIR_PIPC)
-		ip_controlled_driver(port, bit, true);
-	else {
+
+	if (dir == DIR_LVDS) {
 		ip_controlled_driver(port, bit, false);
 		set_direction(port, bit, dir);
+	} else {
+		if (dir == DIR_PIPC)
+			ip_controlled_driver(port, bit, true);
+		else {
+			ip_controlled_driver(port, bit, false);
+			set_direction(port, bit, dir);
+		}
 	}
 
 	return set_mode(port, bit, mode);
@@ -294,7 +304,7 @@ int rza1_pfc_pin_bidirection(enum pfc_pin_number pinnum, bool bidirection)
 	port = get_port_bitshift(&bit);
 	set_bidirection(port, bit, bidirection);
 
-	return 0; 
+	return 0;
 }
 EXPORT_SYMBOL(rza1_pfc_pin_bidirection);
 

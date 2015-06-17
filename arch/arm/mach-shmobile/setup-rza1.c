@@ -35,6 +35,7 @@
 #include <linux/usb/r8a66597.h>
 #include <linux/spi/sh_spibsc.h>
 #include <linux/platform_data/dma-rza1.h>
+#include <linux/can/platform/rza1_can.h>
 #include <mach/common.h>
 #include <mach/hardware.h>
 #include <mach/irqs.h>
@@ -76,6 +77,7 @@ void __init rza1_map_io(void)
 	iotable_init(rza1_io_desc, ARRAY_SIZE(rza1_io_desc));
 }
 
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 static struct plat_sci_port scif0_platform_data = {
 	.mapbase	= 0xe8007000,
 	.flags		= UPF_BOOT_AUTOCONF,
@@ -94,6 +96,7 @@ static struct platform_device scif0_device = {
 		.platform_data	= &scif0_platform_data,
 	},
 };
+#endif
 
 static struct plat_sci_port scif1_platform_data = {
 	.mapbase	= 0xe8007800,
@@ -152,6 +155,7 @@ static struct platform_device scif3_device = {
 	},
 };
 
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 static struct plat_sci_port scif4_platform_data = {
 	.mapbase	= 0xe8009000,
 	.flags		= UPF_BOOT_AUTOCONF,
@@ -170,6 +174,7 @@ static struct platform_device scif4_device = {
 		.platform_data	= &scif4_platform_data,
 	},
 };
+#endif
 
 static struct plat_sci_port scif5_platform_data = {
 	.mapbase	= 0xe8009800,
@@ -209,6 +214,7 @@ static struct platform_device scif6_device = {
 	},
 };
 
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 static struct plat_sci_port scif7_platform_data = {
 	.mapbase	= 0xe800a800,
 	.flags		= UPF_BOOT_AUTOCONF,
@@ -227,6 +233,7 @@ static struct platform_device scif7_device = {
 		.platform_data	= &scif7_platform_data,
 	},
 };
+#endif
 
 static struct sh_timer_config mtu2_0_platform_data = {
 	.channel_offset = -0x80,
@@ -257,6 +264,7 @@ static struct platform_device mtu2_0_device = {
 };
 
 /* RTC */
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 static struct resource rtc_resources[] = {
 	[0] = {
 		.start	= 0xfcff1000,
@@ -286,6 +294,7 @@ static struct platform_device rtc_device = {
 	.num_resources	= ARRAY_SIZE(rtc_resources),
 	.resource	= rtc_resources,
 };
+#endif
 
 /* USB Host */
 static struct r8a66597_platdata r8a66597_data = {
@@ -375,6 +384,7 @@ static struct platform_device sh_eth_device = {
 };
 
 /* riic(i2c) */
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 static struct resource i2c_resources0[] = {
 	[0] = {
 		.start	= 0xfcfee000,
@@ -410,6 +420,7 @@ static struct platform_device i2c_device0 = {
 	.num_resources	= ARRAY_SIZE(i2c_resources0),
 	.resource	= i2c_resources0,
 };
+#endif
 
 static struct resource i2c_resources1[] = {
 	[0] = {
@@ -447,6 +458,7 @@ static struct platform_device i2c_device1 = {
 	.resource	= i2c_resources1,
 };
 
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 static struct resource i2c_resources2[] = {
 	[0] = {
 		.start	= 0xfcfee800,
@@ -482,6 +494,7 @@ static struct platform_device i2c_device2 = {
 	.num_resources	= ARRAY_SIZE(i2c_resources2),
 	.resource	= i2c_resources2,
 };
+#endif
 
 static struct resource i2c_resources3[] = {
 	[0] = {
@@ -520,6 +533,13 @@ static struct platform_device i2c_device3 = {
 };
 
 /* SPI */
+static struct rspi_plat_data rspi_pdata = {
+	.data_width = 8,
+	.spcr = false,
+	.txmode = false,
+};
+
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 static struct resource spi0_resources[] = {
 	[0] = {
 		.start	= 0xe800c800,
@@ -531,12 +551,6 @@ static struct resource spi0_resources[] = {
 		.end	= 272,
 		.flags	= IORESOURCE_IRQ,
 	},
-};
-
-static struct rspi_plat_data rspi_pdata = {
-	.data_width = 8,
-	.spcr = false,
-	.txmode = false,
 };
 
 static struct platform_device spi0_device = {
@@ -617,6 +631,7 @@ static struct platform_device spi3_device = {
 	.num_resources	= ARRAY_SIZE(spi3_resources),
 	.resource	= spi3_resources,
 };
+#endif
 
 static struct resource spi4_resources[] = {
 	[0] = {
@@ -639,6 +654,53 @@ static struct platform_device spi4_device = {
 	},
 	.num_resources	= ARRAY_SIZE(spi4_resources),
 	.resource	= spi4_resources,
+};
+
+static struct resource rz_can_resources[] = {
+	[0] = {
+		.start	= 0xe803a000,
+		.end	= 0xe803b813,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= 258,
+		.end	= 258,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[2] = {
+		.start	= 260,
+		.end	= 260,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[3] = {
+		.start	= 259,
+		.end	= 259,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[4] = {
+		.start	= 253,
+		.end	= 253,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct rz_can_platform_data rz_can_data = {
+#ifdef CONFIG_MACH_DIMMRZA1H
+	.channel	= 4,
+#else
+	.channel	= 1,
+#endif
+	.clock_select	= CLKR_CLKC,
+};
+
+static struct platform_device rz_can_device = {
+	.name		= "rz_can",
+	.num_resources	= ARRAY_SIZE(rz_can_resources),
+	.resource	= rz_can_resources,
+	.dev	= {
+		.platform_data	= &rz_can_data,
+
+	},
 };
 
 /* ADC */
@@ -708,6 +770,7 @@ static struct platform_device spibsc0_device = {
 	.resource	= spibsc0_resources,
 };
 
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 static struct sh_spibsc_info spibsc1_info = {
 	.bus_num	= 6,
 };
@@ -727,6 +790,7 @@ static struct platform_device spibsc1_device = {
 	.num_resources	= ARRAY_SIZE(spibsc1_resources),
 	.resource	= spibsc1_resources,
 };
+#endif
 
 /* DMA */
 #define CHCFG(reqd_v, loen_v, hien_v, lvl_v, am_v, sds_v, dds_v, tm_v)\
@@ -953,35 +1017,52 @@ static struct platform_device scux_device = {
 };
 
 static struct platform_device *rza1_devices[] __initdata = {
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 	&i2c_device0,
+#endif
 	&i2c_device1,
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 	&i2c_device2,
+#endif
 	&i2c_device3,
 	&r8a66597_usb_host0_device,
 	&r8a66597_usb_host1_device,
 	&sh_eth_device,
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 	&spi0_device,
 	&spi1_device,
 	&spi2_device,
 	&spi3_device,
+#endif
 	&spi4_device,
 	&adc0_device,
 	&spibsc0_device,
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 	&spibsc1_device,
+#endif
+	&rz_can_device,
 };
 
 static struct platform_device *rza1_early_devices[] __initdata = {
 	&dma_device,
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 	&scif0_device,
+#endif
 	&scif1_device,
 	&scif2_device,
 	&scif3_device,
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 	&scif4_device,
+#endif
 	&scif5_device,
 	&scif6_device,
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 	&scif7_device,
+#endif
 	&mtu2_0_device,
+#if !defined(CONFIG_MACH_DIMMRZA1H)
 	&rtc_device,
+#endif
 	&alsa_soc_platform_device,
 	&scux_device,
 };

@@ -18,15 +18,14 @@
  *
  */
 
-#if 0
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/fb.h>
 #include <mach/common.h>
 #include <mach/rza1.h>
 #include <video/vdc5fb.h>
-#endif
 
 /*************************************************************************/
 /* RESOURCES */
@@ -39,12 +38,21 @@ static struct resource vdc5fb_resources_ch0[VDC5FB_NUM_RES] = {
 		.end	= (VDC5FB_REG_BASE(0) + VDC5FB_REG_SIZE - 1),
 		.flags	= IORESOURCE_MEM,
 	},
+#if (CONFIG_MEMORY_START == 0x20000000)
+	[1] = {
+		.name	= "vdc5fb.0: fb",
+		.start	= 0,
+		.end	= 0,
+		.flags	= IORESOURCE_MEM,
+	},
+#else
 	[1] = {
 		.name	= "vdc5fb.0: fb",
 		.start	= 0x60200000,
 		.end	= 0x605fffff,
 		.flags	= IORESOURCE_MEM,
 	},
+#endif
 	[2] = {
 		.name	= "vdc5fb.0: irq",
 		.start	= VDC5FB_IRQ_BASE(0),
@@ -61,20 +69,105 @@ static struct resource vdc5fb_resources_ch1[VDC5FB_NUM_RES] = {
 		.end	= (VDC5FB_REG_BASE(1) + VDC5FB_REG_SIZE - 1),
 		.flags	= IORESOURCE_MEM,
 	},
+#if (CONFIG_MEMORY_START == 0x20000000)
+	[1] = {
+		.name	= "vdc5fb.1: fb",
+		.start	= 0,
+		.end	= 0,
+		.flags	= IORESOURCE_MEM,
+	},
+#else
 	[1] = {
 		.name	= "vdc5fb.1: fb",
 		.start	= 0x60600000,
 		.end	= 0x609fffff,
 		.flags	= IORESOURCE_MEM,
 	},
+#endif
 	[2] = {
 		.name	= "vdc5fb.1: irq",
 		.start	= VDC5FB_IRQ_BASE(1),
 		.end	= (VDC5FB_IRQ_BASE(1) + VDC5FB_IRQ_SIZE - 1),
 		.flags	= IORESOURCE_IRQ,
 	},
+	[3] = {
+		.name	= "lvds: reg",
+		.start	= VDC5FB_REG_LVDS,
+		.end	= (VDC5FB_REG_LVDS + VDC5FB_REG_LVDS_SIZE - 1),
+		.flags	= IORESOURCE_MEM,
+	},
 };
 #endif
+
+/*************************************************************************/
+/* LVDS */
+
+static struct fb_videomode videomode_lvds = {
+	.name		= "LVDS",
+	.refresh	= 60,
+	.xres		= 800,
+	.yres		= 480,
+	.pixclock	= 31250,
+	.left_margin	= 86,
+	.right_margin	= 42,
+	.upper_margin	= 32,
+	.lower_margin	= 10,
+	.hsync_len	= 128,
+	.vsync_len	= 2,
+	.sync		= 0,
+	.vmode		= 0,
+	.flag		= 0,
+};
+
+static int vdc5fb_pinmux_lvds(struct platform_device *pdev);
+
+static struct vdc5fb_pdata vdc5fb_pdata_lvds = {
+	.name			= "LVDS",
+	.videomode		= &videomode_lvds,
+	.panel_ocksel		= OCKSEL_PLL_DIV7,
+	.panel_icksel		= 0,
+	.bpp			= 32,
+	.panel_width		= 0,
+	.panel_height		= 0,
+	.flm_max		= 1,
+	.out_format		= OUT_FORMAT_RGB888,
+	.use_lvds		= 1,
+	.lvds			= {
+		.lvds_in_clk_sel	= VDC5_LVDS_INCLK_SEL_PERI,
+		.lvds_idiv_set		= VDC5_LVDS_NDIV_4,
+		.lvds_pll_tst		= (uint16_t)8u,
+		.lvds_odiv_set		= VDC5_LVDS_NDIV_4,
+		.lvds_pll_fd		= (uint16_t)56u,
+		.lvds_pll_rd		= (uint16_t)(1u-1u),
+		.lvds_pll_od		= VDC5_LVDS_PLL_NOD_4,
+	},
+	.tcon_sel		= {
+		[LCD_TCON0]	= TCON_SEL_UNUSED,
+		[LCD_TCON1]	= TCON_SEL_UNUSED,
+		[LCD_TCON2]	= TCON_SEL_UNUSED,
+		[LCD_TCON3]	= TCON_SEL_DE,
+		[LCD_TCON4]	= TCON_SEL_UNUSED,
+		[LCD_TCON5]	= TCON_SEL_UNUSED,
+		[LCD_TCON6]	= TCON_SEL_UNUSED,
+	},
+	.pinmux			= vdc5fb_pinmux_lvds,
+	.reset			= NULL,
+};
+
+
+static int vdc5fb_pinmux_lvds(struct platform_device *pdev)
+{
+	rza1_pfc_pin_assign(P5_0, ALT1, DIR_LVDS);
+	rza1_pfc_pin_assign(P5_1, ALT1, DIR_LVDS);
+	rza1_pfc_pin_assign(P5_2, ALT1, DIR_LVDS);
+	rza1_pfc_pin_assign(P5_3, ALT1, DIR_LVDS);
+	rza1_pfc_pin_assign(P5_4, ALT1, DIR_LVDS);
+	rza1_pfc_pin_assign(P5_5, ALT1, DIR_LVDS);
+	rza1_pfc_pin_assign(P5_6, ALT1, DIR_LVDS);
+	rza1_pfc_pin_assign(P5_7, ALT1, DIR_LVDS);
+
+	return 0;
+}
 
 /*************************************************************************/
 /* LCD MONITOR */
@@ -140,6 +233,46 @@ static struct fb_videomode videomode_svga = {
 };
 #endif
 
+static struct fb_videomode videomode_umsh = {
+	.name           = "UMSH",
+	.refresh        = 67,	/* unsued */
+	.xres           = 800,
+	.yres           = 480,
+	.pixclock       = 29850,
+	.left_margin    = 1,
+	.right_margin   = 80,
+	.upper_margin   = 20,
+	.lower_margin   = 22,
+	.hsync_len      = 48,
+	.vsync_len      = 3,
+	.sync           = 0,
+	.vmode          = FB_VMODE_NONINTERLACED,
+	.flag           = 0,
+};
+
+static struct vdc5fb_pdata vdc5fb_pdata_ch0_umsh = {
+	.name           = "UMSH",
+	.videomode      = &videomode_umsh,
+	.panel_icksel   = ICKSEL_P1CLK,
+	.bpp            = 16,
+	.panel_width    = 0,	/* unused */
+	.panel_height   = 0,	/* unused */
+	.flm_max        = 1,
+	.out_format     = OUT_FORMAT_RGB666,
+	.use_lvds       = 0,
+	.tcon_sel       = {
+		[LCD_TCON0]	= TCON_SEL_STH,     /* HSYNC */
+		[LCD_TCON1]	= TCON_SEL_STVA,    /* VSYNC */
+		[LCD_TCON2]	= TCON_SEL_UNUSED,  /* NC */
+		[LCD_TCON3]	= TCON_SEL_DE,      /* DE */
+		[LCD_TCON4]	= TCON_SEL_UNUSED,  /* NC */
+		[LCD_TCON5]	= TCON_SEL_UNUSED,  /* NC */
+		[LCD_TCON6]	= TCON_SEL_UNUSED,  /* NC */
+	},
+	.pinmux         = NULL,
+	.reset          = NULL,
+};
+
 static int vdc5fb_pinmux_vga(struct platform_device *pdev);
 
 static struct vdc5fb_pdata vdc5fb_pdata_ch0_vga = {
@@ -164,6 +297,7 @@ static struct vdc5fb_pdata vdc5fb_pdata_ch0_vga = {
 	.pinmux			= vdc5fb_pinmux_vga,
 	.reset			= NULL,
 };
+
 static struct vdc5fb_pdata vdc5fb_pdata_ch1_vga = {
 	.name			= "VESA VGA",
 	.videomode		= &videomode_xga,
@@ -305,6 +439,82 @@ static int vdc5fb_pinmux_vga(struct platform_device *pdev)
 }
 
 /*************************************************************************/
+/* LCD */
+
+static struct fb_videomode videomode_wqvga_lcd_kit = {
+	.name		= "WQVGA",
+	.refresh	= 60,
+	.xres		= 480,
+	.yres		= 272,
+	.pixclock	= PIXCLOCK(P1CLK, 7),
+	.left_margin	= 43,
+	.right_margin	= 8,
+	.upper_margin	= 3,
+	.lower_margin	= 3,
+	.hsync_len	= 41,
+	.vsync_len	= 10,
+	.sync		= (FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT),
+	.vmode		= 0,
+	.flag		= 0,
+};
+
+static int vdc5fb_pinmux_lcd_kit(struct platform_device *pdev);
+
+static struct vdc5fb_pdata vdc5fb_pdata_ch0_lcd_kit = {
+	.name			= "LCD",
+	.videomode		= &videomode_wqvga_lcd_kit,
+	.panel_icksel		= ICKSEL_P1CLK,
+	.bpp			= 16,
+	.panel_width		= 184,	/* mm, unused */
+	.panel_height		= 132,	/* mm, unused */
+	.flm_max		= 1,
+	.out_format		= OUT_FORMAT_RGB565,
+	.use_lvds		= 0,
+	.tcon_sel		= {
+		[LCD_TCON0]	= TCON_SEL_DE,		/* DE */
+		[LCD_TCON1]	= TCON_SEL_UNUSED,	/* NC */
+		[LCD_TCON2]	= TCON_SEL_UNUSED,	/* NC */
+		[LCD_TCON3]	= TCON_SEL_UNUSED,	/* NC */
+		[LCD_TCON4]	= TCON_SEL_UNUSED,	/* NC */
+		[LCD_TCON5]	= TCON_SEL_UNUSED,	/* NC */
+		[LCD_TCON6]	= TCON_SEL_UNUSED,	/* NC */
+	},
+	.pinmux			= vdc5fb_pinmux_lcd_kit,
+	.reset			= NULL,
+};
+
+static int vdc5fb_pinmux_lcd_kit(struct platform_device *pdev)
+{
+	struct vdc5fb_pdata *pdata = (struct vdc5fb_pdata *)pdev->dev.platform_data;
+
+	if (pdev->id == 0) {
+		rza1_pfc_pin_assign(P3_8, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P3_9, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P3_10, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P3_11, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P3_12, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P3_13, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P3_14, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P3_15, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P4_0, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P4_1, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P4_2, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P4_3, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P4_4, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P4_5, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P4_6, ALT1, DIR_PIPC);
+		rza1_pfc_pin_assign(P4_7, ALT1, DIR_PIPC);
+
+		rza1_pfc_pin_assign(P3_0, ALT1, DIR_PIPC);
+
+		if (pdata->tcon_sel[LCD_TCON0] != TCON_SEL_UNUSED)
+			rza1_pfc_pin_assign(P3_1, ALT1, DIR_PIPC);
+	}
+
+	return 0;
+}
+
+/*************************************************************************/
 /* LCD-KIT-B01 */
 
 static struct fb_videomode videomode_wvga_lcd_kit_b01 = {
@@ -349,6 +559,7 @@ static struct vdc5fb_pdata vdc5fb_pdata_ch0_lcd_kit_b01 = {
 	.pinmux			= vdc5fb_pinmux_lcd_kit_b01,
 	.reset			= vdc5fb_reset_lcd_kit_b01,
 };
+
 static struct vdc5fb_pdata vdc5fb_pdata_ch1_lcd_kit_b01 = {
 	.name			= "LCD-KIT-B01",
 	.videomode		= &videomode_wvga_lcd_kit_b01,
@@ -543,8 +754,12 @@ static struct platform_device vdc5fb_devices[VDC5FB_NUM_CH] = {
 
 int disable_ether /* = 0 */;
 static int disable_sdhi /* = 0 */;
-static unsigned int vdc5fb0_opts = 1;
-static unsigned int vdc5fb1_opts /* = 0 */;
+#if defined(CONFIG_MACH_DIMMRZA1H)
+static unsigned int vdc5fb0_opts = 4;
+#else
+static unsigned int vdc5fb0_opts;
+#endif
+static unsigned int vdc5fb1_opts;
 
 int __init early_vdc5fb0(char *str)
 {
@@ -556,7 +771,7 @@ early_param("vdc5fb0", early_vdc5fb0);
 int __init early_vdc5fb1(char *str)
 {
 	get_option(&str, &vdc5fb1_opts);
-	if (vdc5fb1_opts != 0) {
+	if (vdc5fb1_opts != 0 && vdc5fb1_opts != 4) {
 		disable_ether = 1;
 		disable_sdhi = 1;
 	}
@@ -600,7 +815,12 @@ static int vdc5fb_setup(void)
 				pdev->dev.platform_data =
 					&vdc5fb_pdata_ch0_vga;
 				break;
-			case 3:	/* Add channel 1 first */
+			case 3:
+				pdev->dev.platform_data =
+					&vdc5fb_pdata_ch0_lcd_kit;
+			case 4:
+				pdev->dev.platform_data =
+					&vdc5fb_pdata_ch0_umsh;
 				break;
 			default:
 				break;
@@ -627,6 +847,9 @@ static int vdc5fb_setup(void)
 				pdev->dev.platform_data =
 					&vdc5fb_pdata_ch1_vga;
 				break;
+			case 4:
+				pdev->dev.platform_data =
+					&vdc5fb_pdata_lvds;
 			default:
 				break;
 			}

@@ -51,6 +51,7 @@ enum pfc_direction {
 	DIR_OUT = 0,
 	DIR_IN,
 	DIR_PIPC,
+	DIR_LVDS,
 };
 
 extern int disable_ether;
@@ -63,7 +64,12 @@ extern void rza1_map_io(void);
 extern int rza1_pinmux_setup(void);
 extern int rza1_pfc_pin_assign(enum pfc_pin_number pinnum, enum pfc_mode mode,
 			       enum pfc_direction dir);
+extern void rza1_pfc_pin_lvds(void);
 extern int rza1_pfc_pin_bidirection(enum pfc_pin_number pinnum, bool bidirection);
+
+#ifdef CONFIG_MACH_RSKRZA1
 int rskrza1_board_i2c_pfc_assign(int id);
+int rskrza1_board_can_pfc_assign(int channel);
+#endif
 
 #endif /* __ASM_RZA1_H__ */

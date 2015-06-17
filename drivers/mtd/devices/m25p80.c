@@ -935,12 +935,9 @@ static int m25p_probe(struct spi_device *spi)
 	if (info->addr_width)
 		flash->addr_width = info->addr_width;
 	else {
-		/* enable 4-byte addressing if the device exceeds 16MiB */
-		if (flash->mtd.size > 0x1000000) {
-			flash->addr_width = 4;
-			set_4byte(flash, info->jedec_id, 1);
-		} else
-			flash->addr_width = 3;
+		/* enable 4-byte addressing (3-Byte addressing is erroneous) */
+		flash->addr_width = 4;
+		set_4byte(flash, info->jedec_id, 1);
 	}
 
 	dev_info(&spi->dev, "%s (%lld Kbytes)\n", id->name,

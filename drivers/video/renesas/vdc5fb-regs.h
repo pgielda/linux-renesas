@@ -484,6 +484,24 @@ enum {
 	VDC5FB_MAX_IRQS,
 };
 
+enum {
+	LVDS_UPDATE = 0,
+	LVDSFCL,
+	LCLKSELR,
+	LPLLSETR,
+	LPLLMONR,
+	VDC5FB_LVDS_MAX_REGS
+};
+
+#define	VDC5FB_LVDS_OFFSET(x)	((x) - VDC5FB_REG_LVDS)
+static unsigned long vdc5fb_lvds_offsets[VDC5FB_LVDS_MAX_REGS] = {
+	[LVDS_UPDATE]		= VDC5FB_LVDS_OFFSET(0xFCFF7A30),
+	[LVDSFCL]		= VDC5FB_LVDS_OFFSET(0xFCFF7A34),
+	[LCLKSELR]		= VDC5FB_LVDS_OFFSET(0xFCFF7A50),
+	[LPLLSETR]		= VDC5FB_LVDS_OFFSET(0xFCFF7A54),
+	[LPLLMONR]		= VDC5FB_LVDS_OFFSET(0xFCFF7A58),
+};
+
 /* REGISTER ADDRESS OFFSET */
 #define	VDC5FB_OFFSET(x)	((x) - VDC5FB_REG_BASE(0))
 static unsigned long vdc5fb_offsets[VDC5FB_MAX_REGS] = {
@@ -955,6 +973,22 @@ static const char *irq_names[VDC5FB_MAX_IRQS] = {
 	((((a) & 0xffu) << 24) | (((g) & 0xffu) << 16) \
 	| (((b) & 0xffu) << 8) | ((r) & 0xffu))
 
+/* LVDS */
+#define LVDS_CLK_EN		(1u << 4)
+#define LVDS_PLL_PD		(1u << 0)
+#define LVDS_VDC_SEL		(1u << 1)
+#define LVDS_PLL_LD		(1u << 0)
+#define LVDS_LCLKSELR_MASK	(0x0703FF02u)
+#define LVDS_LPLLSETR_MASK	(0x07FF1F30u)
+
+#define LVDS_SET_IN_CLK_SEL(x)	(((x) & 0x7) << 24)
+#define LVDS_SET_IDIV(x)	(((x) & 0x3) << 16)
+#define LVDS_SET_TST(x)		(((x) & 0x3f) << 10)
+#define LVDS_SET_ODIV(x)	(((x) & 0x3) << 8)
+#define LVDS_SET_FD(x)		(((x) & 0x7ff) << 16)
+#define LVDS_SET_RD(x)		(((x) & 0x1f) << 8)
+#define LVDS_SET_OD(x)		(((x) & 0x3) << 4)
+
 /* SYSCNT_PANEL_CLK */
 #define	PANEL_DCDR(x)		(((x) & 0x3fu) << 0)
 #define PANEL_ICKEN		(1u << 8)
@@ -1105,6 +1139,16 @@ static unsigned long vdc5fb_read(struct vdc5fb_priv *priv, int reg)
 		return ioread16(priv->base + vdc5fb_offsets[reg]);
 	else
 		return ioread32(priv->base + vdc5fb_offsets[reg]);
+}
+
+static void vdc5fb_lvds_write(struct vdc5fb_priv *priv, int reg, u32 data)
+{
+	iowrite32((u32)data, (priv->lvds_base + vdc5fb_lvds_offsets[reg]));
+}
+
+static unsigned long vdc5fb_lvds_read(struct vdc5fb_priv *priv, int reg)
+{
+	return ioread32(priv->lvds_base + vdc5fb_lvds_offsets[reg]);
 }
 
 static void vdc5fb_setbits(struct vdc5fb_priv *priv, int reg, u32 bits)
