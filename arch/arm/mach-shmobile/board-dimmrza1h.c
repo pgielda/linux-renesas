@@ -42,8 +42,12 @@
 #include <linux/fb.h>
 #include <mach/rza1.h>
 #include <video/vdc5fb.h>
+#include <linux/usb/r8a66597.h>
 
 #define IRQ_TOUCH_ID 510
+
+#define gic_spi(nr)             ((nr) + 32)
+#define gic_iid(nr)             (nr) /* ICCIAR / interrupt ID */
 
 /* MMCIF */
 static struct resource sh_mmcif_resources[] = {
@@ -235,7 +239,6 @@ static struct mtd_partition flash_partitions[] = {
 };
 
 
-
 static struct flash_platform_data spi_flash_data0 = {
 	.name	= "m25p80",
 	.parts	= flash_partitions,
@@ -265,6 +268,42 @@ static struct spi_board_info dimmrza1h_spi_devices[] __initdata = {
 		.platform_data = &spi_flash_data0,
 	},
 };
+
+/* USB Host */
+static const struct r8a66597_platdata r8a66597_pdata __initconst = {
+ .endian = 0,
+ .on_chip = 1,
+ .xtal = R8A66597_PLATDATA_XTAL_48MHZ,
+};
+
+static const struct resource r8a66597_usb_host0_resources[] __initconst = {
+ DEFINE_RES_MEM(0xe8010000, 0x1a0),
+ DEFINE_RES_IRQ(gic_iid(73)),
+};
+
+static const struct platform_device_info r8a66597_usb_host0_info __initconst= {
+ .name = "r8a66597_hcd",
+ .id = 0,
+ .data = &r8a66597_pdata,
+ .size_data = sizeof(r8a66597_pdata),
+ .res = r8a66597_usb_host0_resources,
+ .num_res = ARRAY_SIZE(r8a66597_usb_host0_resources),
+};
+
+static const struct resource r8a66597_usb_host1_resources[] __initconst = {
+ DEFINE_RES_MEM(0xe8207000, 0x1a0),
+ DEFINE_RES_IRQ(gic_iid(74)),
+};
+
+static const struct platform_device_info r8a66597_usb_host1_info __initconst = {
+ .name = "r8a66597_hcd",
+ .id = 1,
+ .data = &r8a66597_pdata,
+ .size_data = sizeof(r8a66597_pdata),
+ .res = r8a66597_usb_host1_resources,
+ .num_res = ARRAY_SIZE(r8a66597_usb_host1_resources),
+};
+
 
 static void __init dimmrza1h_init_spi(void)
 {
@@ -339,6 +378,10 @@ void __init dimmrza1h_init(void)
 #if defined(CONFIG_FB_VDC5)
 	vdc5fb_setup();
 #endif
+
+  platform_device_register_full(&r8a66597_usb_host0_info);
+  platform_device_register_full(&r8a66597_usb_host1_info);
+
 }
 
 static const char *dimmrza1h_boards_compat_dt[] __initdata = {
